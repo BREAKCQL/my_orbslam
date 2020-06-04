@@ -46,7 +46,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     "under certain conditions. See LICENSE.txt." << endl << endl;
 
     cout << "Input sensor was set to: ";
-
+    
+    //1.设置相机的类型
     if(mSensor==MONOCULAR)
         cout << "Monocular" << endl;
     else if(mSensor==STEREO)
@@ -54,7 +55,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     else if(mSensor==RGBD)
         cout << "RGB-D" << endl;
 
-    //Check settings file
+    //2.设置setting文件  Check settings file 
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
@@ -65,7 +66,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Load ORB Vocabulary
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
-
+    
+    //3.初始化词袋类，并读取词袋
     mpVocabulary = new ORBVocabulary();
     bool bVocLoad = false; // chose loading method based on file extension
     if (has_suffix(strVocFile, ".txt"))
@@ -82,30 +84,32 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
     cout << "Vocabulary loaded!" << endl << endl;
 
-    //Create KeyFrame Database
+    //4. 用词袋class初始化建立keyFrameDatabase(这个类主要维护关键帧与词袋的联系) Create KeyFrame Database
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
-    //Create the Map
+    //5.创建map类(map类主要管理局部MapPoints和keyFrame) Create the Map
     mpMap = new Map();
 
-    //Create Drawers. These are used by the Viewer
+    //6.这两个类用来可视化SLAM系统运行中的状态。Create Drawers. These are used by the Viewer
     mpFrameDrawer = new FrameDrawer(mpMap);
     mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
+    //7.初始化Tracking线程。也是系统的主线程
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
                              mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
 
     //Initialize the Local Mapping thread and launch
+    //8.初始化localmap线程
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
     mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
 
-    //Initialize the Loop Closing thread and launch
+    //9.Initialize the Loop Closing thread and launch
     mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
     mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
-    //Initialize the Viewer thread and launch
+    //10.Initialize the Viewer thread and launch
     mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
     if(bUseViewer)
         mptViewer = new thread(&Viewer::Run, mpViewer);
@@ -113,6 +117,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpTracker->SetViewer(mpViewer);
 
     //Set pointers between threads
+    //11.三个主要线程互相有联系，需要改变各自类的里面的状态，用以指导本线程的后续操作
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
 
@@ -131,9 +136,11 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
         exit(-1);
     }   
 
-    // Check mode change
+    // Check mode change 只可以通过可视化见面的按钮才会改变这些状态
     {
         unique_lock<mutex> lock(mMutexMode);
+        //检查是否激活纯定位模式，这种模式会停止localmapping线程，表现为纯vo
+        //这个只会在可视化界面按下那个按钮才会改变这个状态值
         if(mbActivateLocalizationMode)
         {
             mpLocalMapper->RequestStop();
@@ -148,6 +155,8 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
             mpTracker->InformOnlyTracking(true);// 定位时，只跟踪
             mbActivateLocalizationMode = false;
         }
+        //检查是否抑制纯定位模式，恢复整个slam模式
+        //这个只会在可视化界面按下那个按钮才会改变这个状态值，同上面的互为相反状态
         if(mbDeactivateLocalizationMode)
         {
             mpTracker->InformOnlyTracking(false);
@@ -156,7 +165,10 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
         }
     }
 
-    // Check reset
+    // Check reset 
+    //1.可以通过可视化界面reset按钮改变
+    //2.Tracking线程track的时候跟踪丢失
+    //reset的结果是将各个类里的状态，数据设置为初始化状态，令用一个状态量控制三大线程无限sleep直到控制量状态改变
     {
     unique_lock<mutex> lock(mMutexReset);
     if(mbReset)
@@ -166,6 +178,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
     }
     }
 
+    //处理完各种异常状态，开始对双目图像进行实际跟踪
     return mpTracker->GrabImageStereo(imLeft,imRight,timestamp);
 }
 

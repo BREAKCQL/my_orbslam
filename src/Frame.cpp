@@ -63,6 +63,8 @@ Frame::Frame(const Frame &frame)
 
 
 // 双目的初始化
+//1.对左右图像orb特征子提取并匹配
+//2.用图像畸变系数，opencv去畸变函数对特征子的像素去畸变
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractorLeft),mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mb(0), mThDepth(thDepth),
      mpReferenceKF(static_cast<KeyFrame*>(NULL))

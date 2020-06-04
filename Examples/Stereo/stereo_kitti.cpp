@@ -51,6 +51,10 @@ int main(int argc, char **argv)
     const int nImages = vstrImageLeft.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
+    //system初始化 主要有以下一些功能步骤：
+    //1.设置相机类型，读取配置文件，读取词袋
+    //2.初始化keyFrameDatabase  map   mpFrameDrawer mpMapDrawer等类
+    //3初始化Tracking LocalMapping LoopClosing三大主线程+可视化Viewer线程，并设置三大线程相互联系
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
 
     // Vector for tracking time statistics
@@ -80,6 +84,7 @@ int main(int argc, char **argv)
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
         // Pass the images to the SLAM system
+        //输入双目影像
         SLAM.TrackStereo(imLeft,imRight,tframe);        
 
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
