@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     //1.设置相机类型，读取配置文件，读取词袋
     //2.初始化keyFrameDatabase  map   mpFrameDrawer mpMapDrawer等类
     //3初始化Tracking LocalMapping LoopClosing三大主线程+可视化Viewer线程，并设置三大线程相互联系
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,false);
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;

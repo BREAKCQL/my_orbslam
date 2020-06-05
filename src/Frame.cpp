@@ -65,6 +65,7 @@ Frame::Frame(const Frame &frame)
 // 双目的初始化
 //1.对左右图像orb特征子提取并匹配
 //2.用图像畸变系数，opencv去畸变函数对特征子的像素去畸变
+//3.基于匹配好，去畸变了的特征子进行计算点的深度
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractorLeft),mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mb(0), mThDepth(thDepth),
      mpReferenceKF(static_cast<KeyFrame*>(NULL))
@@ -287,12 +288,11 @@ void Frame::UpdatePoseMatrices()
 {
     // [x_camera 1] = [R|t]*[x_world 1]，坐标为齐次形式
     // x_camera = R*x_world + t
-    mRcw = mTcw.rowRange(0,3).colRange(0,3);
-    mRwc = mRcw.t();
-    mtcw = mTcw.rowRange(0,3).col(3);
-    // mtcw, 即相机坐标系下相机坐标系到世界坐标系间的向量, 向量方向由相机坐标系指向世界坐标系
-    // mOw, 即世界坐标系下世界坐标系到相机坐标系间的向量, 向量方向由世界坐标系指向相机坐标系
-    mOw = -mRcw.t()*mtcw;
+    mRcw = mTcw.rowRange(0,3).colRange(0,3);//提取出来相机位姿的旋转矩阵（world-<camera），存储到frame的成员变量中
+    mRwc = mRcw.t();//对相机旋转矩阵求逆获取相机到世界坐标系的旋转矩阵（camera->world）
+    //todo:by cql  这里的两个平移量表示的是什么含义
+    mtcw = mTcw.rowRange(0,3).col(3);// mtcw, 即相机坐标系下相机坐标系到世界坐标系间的向量, 向量方向由相机坐标系指向世界坐标系
+    mOw = -mRcw.t()*mtcw;// mOw即mtwc, 即世界坐标系下世界坐标系到相机坐标系间的向量, 向量方向由世界坐标系指向相机坐标系
 }
 
 /**

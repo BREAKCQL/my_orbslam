@@ -227,6 +227,10 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
     }
 
     // 步骤2：构造Frame
+    //frame 包含：
+    //1.同一时刻左右双目图像信息
+    //2.左右图像提取好了的orb特征子，并且进行了匹配，并且将匹配好的特征子的深度也计算出来了 
+    //frame 初始化的时候，不会给本frame的初始位姿赋值，这些其实就是后面track需要做的事情
     mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
     // 步骤3：跟踪
@@ -631,10 +635,11 @@ void Tracking::Track()
  */
 void Tracking::StereoInitialization()
 {
+    //表示当前帧的orb特征子数目是否大于500
     if(mCurrentFrame.N>500)
     {
         // Set Frame pose to the origin
-        // 步骤1：设定初始位姿
+        // 步骤1：设定初始位姿 因为是初始化第一桢，因此设为0
         mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
 
         // Create KeyFrame
@@ -643,6 +648,7 @@ void Tracking::StereoInitialization()
         // KeyFrame包含Frame、地图3D点、以及BoW
         // KeyFrame里有一个mpMap，Tracking里有一个mpMap，而KeyFrame里的mpMap都指向Tracking里的这个mpMap
         // KeyFrame里有一个mpKeyFrameDB，Tracking里有一个mpKeyFrameDB，而KeyFrame里的mpMap都指向Tracking里的这个mpKeyFrameDB
+        // KeyFrame的用处主要为了localmapping，在tracking中主要是产生keyframe，对tracking过程没有影响
         KeyFrame* pKFini = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
 
         // ！！！这里是不是缺少一个 pKFini->ComputeBoW();
@@ -690,8 +696,10 @@ void Tracking::StereoInitialization()
         cout << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
         // 步骤4：在局部地图中添加该初始关键帧
+        //这一步骤向localmapping线程vector插入输入，激活localmapping线程对关键帧的处理
         mpLocalMapper->InsertKeyFrame(pKFini);
-
+        
+        //将当前帧以及当前关键帧的状态赋值给last
         mLastFrame = Frame(mCurrentFrame);
         mnLastKeyFrameId=mCurrentFrame.mnId;
         mpLastKeyFrame = pKFini;
@@ -1000,6 +1008,7 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.SetPose(mLastFrame.mTcw); // 用上一次的Tcw设置初值，在PoseOptimization可以收敛快一些
 
     // 步骤4:通过优化3D-2D的重投影误差来获得位姿
+    // 只优化当前帧的位姿！！！
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
